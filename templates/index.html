@@ -1,216 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuranStream Local Controller</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuranStream · Broadcast Controller</title>
+<style>
+/* Self-contained: no CDN, no framework - the page must render on a bad link. */
+:root{
+  --bg:#0b1016; --panel:#131a24; --panel-2:#182130; --line:#243044;
+  --txt:#e6edf6; --muted:#8b9bb2; --accent:#22c55e; --accent-h:#16a34a;
+  --live:#ef4444; --warn:#f59e0b; --blue:#3b82f6; --r:10px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:20px;margin:0;letter-spacing:.2px}
+h2{font-size:13px;margin:0 0 14px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.sub{color:var(--muted);font-size:12.5px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+input,select{width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--txt);
+  border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--blue)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:180px}
+.mt{margin-top:12px}
+button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:9px 16px;cursor:pointer;color:#fff;
+  background:var(--panel-2);border:1px solid var(--line);transition:background .12s}
+button:hover{background:#22304a}
+button:disabled{opacity:.5;cursor:default}
+.btn-go{background:var(--accent);border-color:var(--accent)}
+.btn-go:hover{background:var(--accent-h)}
+.btn-stop{background:var(--live);border-color:var(--live)}
+.btn-stop:hover{background:#dc2626}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;
+  padding:6px 12px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line)}
+.dot{width:8px;height:8px;border-radius:50%;background:#64748b}
+.on .dot{background:var(--live);animation:pulse 1.6s infinite}
+.warn .dot{background:var(--warn)}
+@keyframes pulse{50%{opacity:.25}}
+.tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--muted);padding:9px 16px;font-size:13px}
+.tab.sel{background:var(--panel-2);color:var(--txt);border-color:var(--blue)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;
+  max-height:52vh;overflow:auto}
+.st{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:11px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.st.cur{border-color:var(--live)}
+.st b{font-weight:600;font-size:13.5px}
+.st small{display:block;color:var(--muted);font-size:11px}
+.st button{padding:6px 13px;font-size:12.5px}
+.live-panel{background:linear-gradient(180deg,#1a2332,#131a24);border:1px solid #2c3a52}
+.live-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:14px}
+.stat span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.stat strong{display:block;font-size:15px;font-weight:600;margin-top:3px;word-break:break-word}
+details{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;color:var(--muted);font-size:12.5px}
+.kv{margin-top:10px;font-size:12.5px;color:var(--muted)}
+.kv div{padding:3px 0}
+.hide{display:none!important}
+.err{background:#3a1519;border:1px solid #7f1d1d;color:#fecaca;padding:10px 12px;border-radius:8px;
+  margin-bottom:14px;font-size:13px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel-2);
+  border:1px solid var(--line);padding:11px 18px;border-radius:9px;font-size:13.5px;
+  box-shadow:0 8px 30px #0008;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.show{opacity:1}
+#toast.bad{border-color:#7f1d1d;background:#3a1519;color:#fecaca}
+</style>
 </head>
-<body class="bg-gray-50 text-gray-900">
-  <div class="max-w-6xl mx-auto p-4">
-    <header class="mb-6">
-      <h1 class="text-2xl font-bold">QuranStream Local Controller</h1>
-      <p class="text-sm text-gray-600">Manage a 24/7 audio stream to Telegram via RTMP.</p>
-    </header>
+<body>
+<div class="wrap">
 
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-      <div class="md:col-span-2 bg-white shadow-sm border rounded p-4">
-        <h2 class="font-semibold mb-3">RTMP Settings</h2>
-        <div class="space-y-3">
-          <div>
-            <label class="block text-sm font-medium mb-1" for="rtmpServer">RTMP Server URL</label>
-            <input id="rtmpServer" type="text" class="w-full border rounded px-3 py-2" placeholder="rtmp://your_server/app" />
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1" for="streamKey">Stream Key</label>
-            <input id="streamKey" type="text" class="w-full border rounded px-3 py-2" placeholder="your_stream_key" />
-          </div>
-          <div class="flex gap-2">
-            <button id="saveSettings" class="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
-            <button id="clearSettings" class="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Clear</button>
-          </div>
-        </div>
-      </div>
-      <div class="bg-white shadow-sm border rounded p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="font-semibold">Status</h2>
-          <button id="stopBtn" class="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700">Stop</button>
-        </div>
-        <div id="statusIndicator" class="text-sm">
-          <span class="text-gray-700">⚫ Offline</span>
-        </div>
-      </div>
-    </section>
+  <header>
+    <div>
+      <h1>QuranStream</h1>
+      <div class="sub">Local Broadcast Controller</div>
+    </div>
+    <div id="pill" class="pill"><span class="dot"></span><span id="pillText">Offline</span></div>
+  </header>
 
-    <section class="bg-white shadow-sm border rounded p-4">
-      <div class="flex items-center gap-3 mb-4">
-        <input id="searchInput" type="text" class="flex-1 border rounded px-3 py-2" placeholder="Search readers..." />
-        <button id="refreshStations" class="px-3 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Refresh</button>
+  <!-- Now streaming ------------------------------------------------------->
+  <section id="livePanel" class="card live-panel hide">
+    <div class="live-head">
+      <div class="pill on"><span class="dot"></span><span id="liveState">LIVE</span></div>
+      <button id="stopBtn" class="btn-stop">Stop Stream</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>Source</span><strong id="sSource">—</strong></div>
+      <div class="stat"><span id="sTitleLabel">Title</span><strong id="sTitle">—</strong></div>
+      <div class="stat"><span>Duration</span><strong id="sDur">00:00:00</strong></div>
+      <div class="stat" id="sQualityBox"><span>Quality</span><strong id="sQuality">—</strong></div>
+      <div class="stat" id="sBitrateBox"><span>Bitrate</span><strong id="sBitrate">—</strong></div>
+      <div class="stat"><span>Connection</span><strong id="sConn">—</strong></div>
+    </div>
+    <details>
+      <summary>Advanced details</summary>
+      <div class="kv">
+        <div>Video: <b id="aVideo">—</b></div>
+        <div>Audio: <b id="aAudio">—</b></div>
+        <div>Source URL: <b id="aUrl">—</b></div>
+        <div>Started: <b id="aStart">—</b></div>
+        <div>Reconnect attempts: <b id="aRetry">0</b></div>
       </div>
-      <div id="stationsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-    </section>
+    </details>
+  </section>
+
+  <div id="banner" class="err hide"></div>
+
+  <!-- RTMP ---------------------------------------------------------------->
+  <section class="card">
+    <h2>RTMP Destination</h2>
+    <div class="row">
+      <div>
+        <label for="rtmpServer">RTMP Server</label>
+        <input id="rtmpServer" type="text" placeholder="rtmps://dc4-1.rtmp.t.me/s" autocomplete="off" />
+      </div>
+      <div>
+        <label for="streamKey">Stream Key</label>
+        <input id="streamKey" type="password" placeholder="paste your Telegram stream key" autocomplete="off" />
+      </div>
+    </div>
+    <div class="row mt" style="flex:0">
+      <button id="saveBtn" class="btn-go" style="flex:0">Save</button>
+      <button id="clearBtn" style="flex:0">Clear</button>
+      <div style="flex:1;min-width:0;align-self:center" class="sub" id="rtmpNote"></div>
+    </div>
+  </section>
+
+  <!-- Sources ------------------------------------------------------------->
+  <div class="tabs">
+    <button class="tab sel" data-tab="quran">Quran Stations</button>
+    <button class="tab" data-tab="yt_live">YouTube Live</button>
+    <button class="tab" data-tab="yt_video">YouTube Video</button>
   </div>
 
-  <script>
-    const rtmpServerEl = document.getElementById('rtmpServer');
-    const streamKeyEl = document.getElementById('streamKey');
-    const saveSettingsEl = document.getElementById('saveSettings');
-    const clearSettingsEl = document.getElementById('clearSettings');
-    const statusIndicatorEl = document.getElementById('statusIndicator');
-    const stopBtnEl = document.getElementById('stopBtn');
-    const searchInputEl = document.getElementById('searchInput');
-    const refreshStationsEl = document.getElementById('refreshStations');
-    const stationsGridEl = document.getElementById('stationsGrid');
+  <section id="panel-quran" class="card">
+    <div class="row" style="margin-bottom:14px">
+      <input id="search" type="search" placeholder="Search readers…" style="flex:3" />
+      <button id="refreshBtn" style="flex:0">Refresh</button>
+    </div>
+    <div id="stations" class="grid"></div>
+  </section>
 
-    function loadSettings() {
-      const server = localStorage.getItem('rtmpServer') || '';
-      const key = localStorage.getItem('streamKey') || '';
-      rtmpServerEl.value = server;
-      streamKeyEl.value = key;
-    }
+  <section id="panel-yt_live" class="card hide">
+    <h2>YouTube Live</h2>
+    <label for="liveUrl">YouTube Live URL</label>
+    <input id="liveUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
+    <div class="row mt">
+      <div style="max-width:200px">
+        <label for="liveQuality">Quality</label>
+        <select id="liveQuality">
+          <option value="low">Low · 480p</option>
+          <option value="medium" selected>Medium · 720p</option>
+          <option value="high">High · 1080p</option>
+        </select>
+      </div>
+    </div>
+    <div class="mt"><button class="btn-go" data-start="youtube_live">Start Live Stream</button></div>
+  </section>
 
-    function saveSettings() {
-      const server = rtmpServerEl.value.trim();
-      const key = streamKeyEl.value.trim();
-      if (!server || !key) {
-        alert('⚠️ Please enter both RTMP Server URL and Stream Key');
-        return;
-      }
-      localStorage.setItem('rtmpServer', server);
-      localStorage.setItem('streamKey', key);
-      alert('✅ Settings saved successfully!');
-    }
+  <section id="panel-yt_video" class="card hide">
+    <h2>YouTube Video</h2>
+    <label for="vidUrl">YouTube Video URL</label>
+    <input id="vidUrl" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
+    <div class="row mt">
+      <div style="max-width:200px">
+        <label for="vidPlayback">Playback</label>
+        <select id="vidPlayback">
+          <option value="once" selected>Play once</option>
+          <option value="loop">Loop</option>
+        </select>
+      </div>
+      <div style="max-width:200px">
+        <label for="vidQuality">Quality</label>
+        <select id="vidQuality">
+          <option value="low">Low · 480p</option>
+          <option value="medium" selected>Medium · 720p</option>
+          <option value="high">High · 1080p</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
+    <div class="mt"><button class="btn-go" data-start="youtube_video">Start Video Stream</button></div>
+  </section>
+</div>
 
-    function clearSettings() {
-      localStorage.removeItem('rtmpServer');
-      localStorage.removeItem('streamKey');
-      rtmpServerEl.value = '';
-      streamKeyEl.value = '';
-    }
+<div id="toast"></div>
 
-    saveSettingsEl.addEventListener('click', saveSettings);
-    clearSettingsEl.addEventListener('click', clearSettings);
+<script>
+const $ = id => document.getElementById(id);
+const LABELS = {quran:'Quran Station', youtube_live:'YouTube Live', youtube_video:'YouTube Video'};
+let stations = [], key = localStorage.getItem('streamKey') || '', keyDirty = false, poll = null, pollMs = 0;
 
-    async function fetchStations() {
-      try {
-        const res = await fetch('/api/stations');
-        const data = await res.json();
-        return Array.isArray(data) ? data : [];
-      } catch (e) {
-        console.error('Failed to fetch stations', e);
-        return [];
-      }
-    }
+/* ---- toast ---------------------------------------------------------- */
+let toastT;
+function toast(msg, bad) {
+  const t = $('toast');
+  t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = '', 3200);
+}
+function banner(msg) {
+  const b = $('banner');
+  b.textContent = msg || ''; b.classList.toggle('hide', !msg);
+}
 
-    function renderStations(stations) {
-      stationsGridEl.innerHTML = '';
-      const query = searchInputEl.value.trim().toLowerCase();
-      const filtered = stations.filter(s =>
-        s.name.toLowerCase().includes(query) || s.url.toLowerCase().includes(query)
-      );
+/* ---- RTMP settings (key is masked, never re-displayed) -------------- */
+function paintKey() {
+  $('streamKey').value = key ? '•'.repeat(12) : '';
+  keyDirty = false;
+  $('rtmpNote').textContent = key ? 'Stream key saved on this device.' : '';
+}
+$('rtmpServer').value = localStorage.getItem('rtmpServer') || '';
+paintKey();
+$('streamKey').addEventListener('focus', () => { if (!keyDirty) { $('streamKey').value = ''; keyDirty = true; } });
+$('saveBtn').onclick = () => {
+  const server = $('rtmpServer').value.trim();
+  if (keyDirty) key = $('streamKey').value.trim();
+  if (!server || !key) return toast('Enter both the RTMP server and the stream key', true);
+  localStorage.setItem('rtmpServer', server);
+  localStorage.setItem('streamKey', key);
+  paintKey(); toast('Settings saved');
+};
+$('clearBtn').onclick = () => {
+  localStorage.removeItem('rtmpServer'); localStorage.removeItem('streamKey');
+  key = ''; $('rtmpServer').value = ''; paintKey(); toast('Settings cleared');
+};
 
-      for (const s of filtered) {
-        const card = document.createElement('div');
-        card.className = 'border rounded p-3 flex flex-col gap-2';
-        const title = document.createElement('div');
-        title.className = 'font-semibold';
-        title.textContent = s.name;
-        const url = document.createElement('div');
-        url.className = 'text-xs text-gray-500 break-all';
-        url.textContent = s.url;
-        const playBtn = document.createElement('button');
-        playBtn.className = 'px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700';
-        playBtn.textContent = 'Play';
-        playBtn.addEventListener('click', async () => {
-          const rtmpServer = rtmpServerEl.value.trim();
-          const key = streamKeyEl.value.trim();
-          console.log('🎵 Play button clicked for:', s.name);
-          console.log('📡 Stream URL:', s.url);
-          console.log('🔑 RTMP Server:', rtmpServer);
-          console.log('🔑 Stream Key:', key.substring(0, 10) + '...');
-          
-          if (!rtmpServer || !key) {
-            console.error('❌ Missing RTMP credentials');
-            alert('Please enter RTMP Server and Stream Key, then Save.');
-            return;
-          }
-          
-          playBtn.disabled = true;
-          playBtn.textContent = 'Starting...';
-          
-          try {
-            console.log('📤 Sending start request...');
-            const res = await fetch('/api/start', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: s.url, rtmp_server: rtmpServer, key })
-            });
-            const data = await res.json();
-            console.log('📥 Response:', data);
-            
-            if (res.ok) {
-              console.log('✅ Stream started successfully');
-              updateStatus();
-              alert('✅ Stream started: ' + s.name);
-            } else {
-              console.error('❌ Error:', data.error);
-              alert('❌ Error: ' + (data.error || 'Failed to start stream'));
-            }
-          } catch (e) {
-            console.error('❌ Network error:', e);
-            alert('❌ Failed to start stream: ' + e.message);
-          } finally {
-            playBtn.disabled = false;
-            playBtn.textContent = 'Play';
-          }
-        });
-        card.appendChild(title);
-        card.appendChild(url);
-        card.appendChild(playBtn);
-        stationsGridEl.appendChild(card);
-      }
-    }
+/* ---- tabs ------------------------------------------------------------ */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('sel', x === t));
+  ['quran','yt_live','yt_video'].forEach(p => $('panel-' + p).classList.toggle('hide', p !== t.dataset.tab));
+});
 
-    async function updateStatus() {
-      try {
-        const res = await fetch('/api/status');
-        const status = await res.json();
-        if (status.running) {
-          statusIndicatorEl.innerHTML = `<span class="text-red-600">🔴 Live${status.name ? ': ' + status.name : ''}</span>`;
-        } else {
-          statusIndicatorEl.innerHTML = '<span class="text-gray-700">⚫ Offline</span>';
-        }
-      } catch (e) {
-        statusIndicatorEl.innerHTML = '<span class="text-gray-700">⚫ Offline</span>';
-      }
-    }
+/* ---- stations (fetched once, cached, filtered client side) ----------- */
+async function loadStations(force) {
+  const cached = force ? null : sessionStorage.getItem('stations');
+  if (cached) { try { stations = JSON.parse(cached); render(); return; } catch (e) {} }
+  try {
+    const r = await fetch('/api/stations');
+    stations = await r.json();
+    sessionStorage.setItem('stations', JSON.stringify(stations));
+  } catch (e) { toast('Could not load stations', true); }
+  render();
+}
+function render() {
+  const q = $('search').value.trim().toLowerCase();
+  const cur = (window._status || {}).url;
+  const frag = document.createDocumentFragment();
+  for (const s of stations) {
+    if (q && !s.name.toLowerCase().includes(q)) continue;
+    const d = document.createElement('div');
+    d.className = 'st' + (s.url === cur ? ' cur' : '');
+    const n = document.createElement('div');
+    n.innerHTML = '<b></b><small>Quran radio</small>';
+    n.querySelector('b').textContent = s.name;
+    const b = document.createElement('button');
+    b.className = 'btn-go'; b.textContent = 'Play';
+    b.onclick = () => start({source_type: 'quran', url: s.url}, b);
+    d.append(n, b); frag.appendChild(d);
+  }
+  $('stations').replaceChildren(frag);
+}
+$('search').oninput = render;
+$('refreshBtn').onclick = () => loadStations(true);
 
-    stopBtnEl.addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/stop', { method: 'POST' });
-        await res.json();
-      } catch (e) {}
-      updateStatus();
+/* ---- start / stop ---------------------------------------------------- */
+async function start(body, btn) {
+  const server = $('rtmpServer').value.trim();
+  if (!server || !key) return toast('Save your RTMP server and stream key first', true);
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Starting…'; banner('');
+  try {
+    const r = await fetch('/api/start', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rtmp_server: server, key, ...body})
     });
+    const data = await r.json();
+    if (!r.ok) { banner(data.error || 'Failed to start the stream'); toast(data.error || 'Failed to start', true); }
+    else toast('Starting stream…');
+  } catch (e) { toast('Could not reach the server', true); }
+  btn.disabled = false; btn.textContent = label;
+  refresh();
+}
+document.querySelectorAll('[data-start]').forEach(b => b.onclick = () => {
+  const live = b.dataset.start === 'youtube_live';
+  const url = (live ? $('liveUrl') : $('vidUrl')).value.trim();
+  if (!url) return toast('Paste a YouTube URL first', true);
+  start({
+    source_type: b.dataset.start, url,
+    quality: (live ? $('liveQuality') : $('vidQuality')).value,
+    playback: live ? 'once' : $('vidPlayback').value
+  }, b);
+});
+$('stopBtn').onclick = async () => {
+  $('stopBtn').disabled = true;
+  try { await fetch('/api/stop', {method: 'POST'}); toast('Stream stopped'); }
+  catch (e) { toast('Could not reach the server', true); }
+  $('stopBtn').disabled = false;
+  refresh();
+};
 
-    searchInputEl.addEventListener('input', async () => {
-      const stations = await fetchStations();
-      renderStations(stations);
-    });
+/* ---- status ---------------------------------------------------------- */
+const hms = s => [s/3600, s/60%60, s%60].map(n => String(Math.floor(n)).padStart(2,'0')).join(':');
+function paint(st) {
+  const was = (window._status || {}).url;
+  window._status = st;
+  const running = st.running;
+  $('pill').className = 'pill' + (st.state === 'LIVE' ? ' on' : (running ? ' warn' : ''));
+  $('pillText').textContent = running ? st.state : (st.state === 'ERROR' ? 'Error' : 'Offline');
+  $('livePanel').classList.toggle('hide', !running);
+  banner(st.error && !running ? st.error : (running && st.state === 'RECONNECTING' ? st.error || 'Reconnecting…' : ''));
 
-    refreshStationsEl.addEventListener('click', async () => {
-      const stations = await fetchStations();
-      renderStations(stations);
-    });
+  if (running) {
+    $('liveState').textContent = st.state;
+    $('sSource').textContent = LABELS[st.source_type] || st.source_type;
+    $('sTitleLabel').textContent = st.source_type === 'quran' ? 'Station' : 'Title';
+    $('sTitle').textContent = st.name || '—';
+    $('sDur').textContent = hms(st.uptime_s || 0);
+    $('sQualityBox').classList.toggle('hide', !st.quality);
+    $('sQuality').textContent = st.quality ? st.quality[0].toUpperCase() + st.quality.slice(1) : '—';
+    const kb = st.bitrate_kbps;
+    $('sBitrate').textContent = !kb ? '—' : (kb >= 1000 ? (kb/1000).toFixed(1) + ' Mbps' : kb + ' kbps');
+    $('sConn').textContent = st.connection || '—';
+    $('aVideo').textContent = st.video || 'none (audio only)';
+    $('aAudio').textContent = st.audio || '—';
+    $('aUrl').textContent = st.url || '—';
+    $('aStart').textContent = st.started_at || '—';
+    $('aRetry').textContent = st.reconnect_attempt || 0;
+  } else if (st.message && st.message !== window._lastMsg) {
+    toast(st.message);            // announce once, not on every poll
+  }
+  window._lastMsg = running ? null : st.message;
+  if (was !== st.url) render();
+  schedule(running ? 4000 : 10000);
+}
+async function refresh() {
+  try { paint(await (await fetch('/api/status')).json()); }
+  catch (e) { schedule(10000); }
+}
+function schedule(ms) {
+  if (poll && pollMs === ms) return;
+  clearInterval(poll); pollMs = ms; poll = setInterval(refresh, ms);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { clearInterval(poll); poll = null; pollMs = 0; } else refresh();
+});
 
-    // Init
-    loadSettings();
-    (async () => {
-      const stations = await fetchStations();
-      renderStations(stations);
-      updateStatus();
-      setInterval(updateStatus, 5000);
-    })();
-  </script>
+loadStations(false);
+refresh();
+</script>
 </body>
 </html>
